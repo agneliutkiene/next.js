@@ -36,6 +36,11 @@ import type { WorkStore } from '../../server/app-render/work-async-storage.exter
 import { createServerSearchParamsForMetadata } from '../../server/request/search-params'
 import { createServerPathnameForMetadata } from '../../server/request/pathname'
 import { isPostpone } from '../../server/lib/router-utils/is-postpone'
+import { workUnitAsyncStorage } from '../../server/app-render/work-unit-async-storage.external'
+import {
+  RenderStage,
+  type StagedRenderingController,
+} from '../../server/app-render/staged-rendering'
 
 import {
   MetadataBoundary,
@@ -58,6 +63,7 @@ export function createMetadataComponents({
   errorType,
   workStore,
   serveStreamingMetadata,
+  isRuntimePrefetchable,
 }: {
   tree: LoaderTree
   pathname: string
@@ -67,6 +73,7 @@ export function createMetadataComponents({
   errorType?: MetadataErrorType | 'redirect'
   workStore: WorkStore
   serveStreamingMetadata: boolean
+  isRuntimePrefetchable: boolean
 }): {
   Viewport: React.ComponentType
   Metadata: React.ComponentType
@@ -74,7 +81,8 @@ export function createMetadataComponents({
 } {
   const searchParams = createServerSearchParamsForMetadata(
     parsedQuery,
-    workStore
+    workStore,
+    isRuntimePrefetchable
   )
   const pathnameForMetadata = createServerPathnameForMetadata(
     pathname,
@@ -82,11 +90,42 @@ export function createMetadataComponents({
   )
 
   async function Viewport() {
+    // Gate metadata to the correct render stage. If the page is not
+    // runtime-prefetchable, defer until the Static stage so that
+    // prefetchable segments get a head start.
+    if (!isRuntimePrefetchable) {
+      const workUnitStore = workUnitAsyncStorage.getStore()
+      if (workUnitStore) {
+        let stagedRendering: StagedRenderingController | null | undefined
+        switch (workUnitStore.type) {
+          case 'request':
+          case 'prerender-runtime':
+            stagedRendering = workUnitStore.stagedRendering
+            break
+          case 'prerender':
+          case 'prerender-client':
+          case 'validation-client':
+          case 'prerender-ppr':
+          case 'prerender-legacy':
+          case 'cache':
+          case 'private-cache':
+          case 'unstable-cache':
+            break
+          default:
+            workUnitStore satisfies never
+        }
+        if (stagedRendering) {
+          await stagedRendering.waitForStage(RenderStage.Static)
+        }
+      }
+    }
+
     const tags = await getResolvedViewport(
       tree,
       searchParams,
       getDynamicParamFromSegment,
       workStore,
+      isRuntimePrefetchable,
       errorType
     ).catch((viewportErr) => {
       // When Legacy PPR is enabled viewport can reject with a Postpone type
@@ -100,7 +139,8 @@ export function createMetadataComponents({
           tree,
           searchParams,
           getDynamicParamFromSegment,
-          workStore
+          workStore,
+          isRuntimePrefetchable
         ).catch(() => null)
       }
       // We're going to throw the error from the metadata outlet so we just render null here instead
@@ -120,6 +160,36 @@ export function createMetadataComponents({
   }
 
   async function Metadata() {
+    // Gate metadata to the correct render stage. If the page is not
+    // runtime-prefetchable, defer until the Static stage so that
+    // prefetchable segments get a head start.
+    if (!isRuntimePrefetchable) {
+      const workUnitStore = workUnitAsyncStorage.getStore()
+      if (workUnitStore) {
+        let stagedRendering: StagedRenderingController | null | undefined
+        switch (workUnitStore.type) {
+          case 'request':
+          case 'prerender-runtime':
+            stagedRendering = workUnitStore.stagedRendering
+            break
+          case 'prerender':
+          case 'prerender-client':
+          case 'validation-client':
+          case 'prerender-ppr':
+          case 'prerender-legacy':
+          case 'cache':
+          case 'private-cache':
+          case 'unstable-cache':
+            break
+          default:
+            workUnitStore satisfies never
+        }
+        if (stagedRendering) {
+          await stagedRendering.waitForStage(RenderStage.Static)
+        }
+      }
+    }
+
     const tags = await getResolvedMetadata(
       tree,
       pathnameForMetadata,
@@ -127,6 +197,7 @@ export function createMetadataComponents({
       getDynamicParamFromSegment,
       metadataContext,
       workStore,
+      isRuntimePrefetchable,
       errorType
     ).catch((metadataErr) => {
       // When Legacy PPR is enabled metadata can reject with a Postpone type
@@ -142,7 +213,8 @@ export function createMetadataComponents({
           searchParams,
           getDynamicParamFromSegment,
           metadataContext,
-          workStore
+          workStore,
+          isRuntimePrefetchable
         ).catch(() => null)
       }
       // We're going to throw the error from the metadata outlet so we just render null here instead
@@ -184,6 +256,7 @@ export function createMetadataComponents({
         getDynamicParamFromSegment,
         metadataContext,
         workStore,
+        isRuntimePrefetchable,
         errorType
       ),
       getResolvedViewport(
@@ -191,6 +264,7 @@ export function createMetadataComponents({
         searchParams,
         getDynamicParamFromSegment,
         workStore,
+        isRuntimePrefetchable,
         errorType
       ),
     ]).then(() => null)
@@ -224,6 +298,7 @@ async function getResolvedMetadataImpl(
   getDynamicParamFromSegment: GetDynamicParamFromSegment,
   metadataContext: MetadataContext,
   workStore: WorkStore,
+  isRuntimePrefetchable: boolean,
   errorType?: MetadataErrorType | 'redirect'
 ): Promise<React.ReactNode> {
   const errorConvention = errorType === 'redirect' ? undefined : errorType
@@ -234,6 +309,7 @@ async function getResolvedMetadataImpl(
     getDynamicParamFromSegment,
     metadataContext,
     workStore,
+    isRuntimePrefetchable,
     errorConvention
   )
 }
@@ -245,7 +321,8 @@ async function getNotFoundMetadataImpl(
   searchParams: Promise<ParsedUrlQuery>,
   getDynamicParamFromSegment: GetDynamicParamFromSegment,
   metadataContext: MetadataContext,
-  workStore: WorkStore
+  workStore: WorkStore,
+  isRuntimePrefetchable: boolean
 ): Promise<React.ReactNode> {
   const notFoundErrorConvention = 'not-found'
   return renderMetadata(
@@ -255,6 +332,7 @@ async function getNotFoundMetadataImpl(
     getDynamicParamFromSegment,
     metadataContext,
     workStore,
+    isRuntimePrefetchable,
     notFoundErrorConvention
   )
 }
@@ -265,6 +343,7 @@ async function getResolvedViewportImpl(
   searchParams: Promise<ParsedUrlQuery>,
   getDynamicParamFromSegment: GetDynamicParamFromSegment,
   workStore: WorkStore,
+  isRuntimePrefetchable: boolean,
   errorType?: MetadataErrorType | 'redirect'
 ): Promise<React.ReactNode> {
   const errorConvention = errorType === 'redirect' ? undefined : errorType
@@ -273,6 +352,7 @@ async function getResolvedViewportImpl(
     searchParams,
     getDynamicParamFromSegment,
     workStore,
+    isRuntimePrefetchable,
     errorConvention
   )
 }
@@ -282,7 +362,8 @@ async function getNotFoundViewportImpl(
   tree: LoaderTree,
   searchParams: Promise<ParsedUrlQuery>,
   getDynamicParamFromSegment: GetDynamicParamFromSegment,
-  workStore: WorkStore
+  workStore: WorkStore,
+  isRuntimePrefetchable: boolean
 ): Promise<React.ReactNode> {
   const notFoundErrorConvention = 'not-found'
   return renderViewport(
@@ -290,6 +371,7 @@ async function getNotFoundViewportImpl(
     searchParams,
     getDynamicParamFromSegment,
     workStore,
+    isRuntimePrefetchable,
     notFoundErrorConvention
   )
 }
@@ -301,6 +383,7 @@ async function renderMetadata(
   getDynamicParamFromSegment: GetDynamicParamFromSegment,
   metadataContext: MetadataContext,
   workStore: WorkStore,
+  isRuntimePrefetchable: boolean,
   errorConvention?: MetadataErrorType
 ) {
   const resolvedMetadata = await resolveMetadata(
@@ -310,7 +393,8 @@ async function renderMetadata(
     errorConvention,
     getDynamicParamFromSegment,
     workStore,
-    metadataContext
+    metadataContext,
+    isRuntimePrefetchable
   )
   const elements: Array<React.ReactNode> =
     createMetadataElements(resolvedMetadata)
@@ -328,6 +412,7 @@ async function renderViewport(
   searchParams: Promise<ParsedUrlQuery>,
   getDynamicParamFromSegment: GetDynamicParamFromSegment,
   workStore: WorkStore,
+  isRuntimePrefetchable: boolean,
   errorConvention?: MetadataErrorType
 ) {
   const resolvedViewport = await resolveViewport(
@@ -335,7 +420,8 @@ async function renderViewport(
     searchParams,
     errorConvention,
     getDynamicParamFromSegment,
-    workStore
+    workStore,
+    isRuntimePrefetchable
   )
 
   const elements: Array<React.ReactNode> =

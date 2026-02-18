@@ -709,7 +709,8 @@ const resolveMetadataItems = cache(async function (
   searchParams: Promise<ParsedUrlQuery>,
   errorConvention: MetadataErrorType | undefined,
   getDynamicParamFromSegment: GetDynamicParamFromSegment,
-  workStore: WorkStore
+  workStore: WorkStore,
+  isRuntimePrefetchable: boolean
 ) {
   const parentParams = {}
   const metadataItems: MetadataItems = []
@@ -724,7 +725,8 @@ const resolveMetadataItems = cache(async function (
     errorConvention,
     errorMetadataItem,
     getDynamicParamFromSegment,
-    workStore
+    workStore,
+    isRuntimePrefetchable
   )
 })
 
@@ -738,7 +740,8 @@ async function resolveMetadataItemsImpl(
   errorConvention: MetadataErrorType | undefined,
   errorMetadataItem: MetadataItems[number],
   getDynamicParamFromSegment: GetDynamicParamFromSegment,
-  workStore: WorkStore
+  workStore: WorkStore,
+  isRuntimePrefetchable: boolean
 ): Promise<MetadataItems> {
   const [segment, parallelRoutes, { page }] = tree
   const currentTreePrefix =
@@ -758,7 +761,11 @@ async function resolveMetadataItemsImpl(
     }
   }
 
-  const params = createServerParamsForMetadata(currentParams, workStore)
+  const params = createServerParamsForMetadata(
+    currentParams,
+    workStore,
+    isRuntimePrefetchable
+  )
   const props: SegmentProps = isPage ? { params, searchParams } : { params }
 
   await collectMetadata({
@@ -784,7 +791,8 @@ async function resolveMetadataItemsImpl(
       errorConvention,
       errorMetadataItem,
       getDynamicParamFromSegment,
-      workStore
+      workStore,
+      isRuntimePrefetchable
     )
   }
 
@@ -803,7 +811,8 @@ const resolveViewportItems = cache(async function (
   searchParams: Promise<ParsedUrlQuery>,
   errorConvention: MetadataErrorType | undefined,
   getDynamicParamFromSegment: GetDynamicParamFromSegment,
-  workStore: WorkStore
+  workStore: WorkStore,
+  isRuntimePrefetchable: boolean
 ) {
   const parentParams = {}
   const viewportItems: ViewportItems = []
@@ -820,7 +829,8 @@ const resolveViewportItems = cache(async function (
     errorConvention,
     errorViewportItemRef,
     getDynamicParamFromSegment,
-    workStore
+    workStore,
+    isRuntimePrefetchable
   )
 })
 
@@ -834,7 +844,8 @@ async function resolveViewportItemsImpl(
   errorConvention: MetadataErrorType | undefined,
   errorViewportItemRef: ErrorViewportItemRef,
   getDynamicParamFromSegment: GetDynamicParamFromSegment,
-  workStore: WorkStore
+  workStore: WorkStore,
+  isRuntimePrefetchable: boolean
 ): Promise<ViewportItems> {
   const [segment, parallelRoutes, { page }] = tree
   const currentTreePrefix =
@@ -854,7 +865,11 @@ async function resolveViewportItemsImpl(
     }
   }
 
-  const params = createServerParamsForMetadata(currentParams, workStore)
+  const params = createServerParamsForMetadata(
+    currentParams,
+    workStore,
+    isRuntimePrefetchable
+  )
 
   let layerProps: LayoutProps | PageProps
   if (isPage) {
@@ -891,7 +906,8 @@ async function resolveViewportItemsImpl(
       errorConvention,
       errorViewportItemRef,
       getDynamicParamFromSegment,
-      workStore
+      workStore,
+      isRuntimePrefetchable
     )
   }
 
@@ -1261,14 +1277,16 @@ export async function resolveMetadata(
   errorConvention: MetadataErrorType | undefined,
   getDynamicParamFromSegment: GetDynamicParamFromSegment,
   workStore: WorkStore,
-  metadataContext: MetadataContext
+  metadataContext: MetadataContext,
+  isRuntimePrefetchable: boolean
 ): Promise<ResolvedMetadata> {
   const metadataItems = await resolveMetadataItems(
     tree,
     searchParams,
     errorConvention,
     getDynamicParamFromSegment,
-    workStore
+    workStore,
+    isRuntimePrefetchable
   )
   return accumulateMetadata(
     workStore.route,
@@ -1284,14 +1302,16 @@ export async function resolveViewport(
   searchParams: Promise<ParsedUrlQuery>,
   errorConvention: MetadataErrorType | undefined,
   getDynamicParamFromSegment: GetDynamicParamFromSegment,
-  workStore: WorkStore
+  workStore: WorkStore,
+  isRuntimePrefetchable: boolean
 ): Promise<ResolvedViewport> {
   const viewportItems = await resolveViewportItems(
     tree,
     searchParams,
     errorConvention,
     getDynamicParamFromSegment,
-    workStore
+    workStore,
+    isRuntimePrefetchable
   )
   return accumulateViewport(viewportItems)
 }

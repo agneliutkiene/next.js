@@ -223,6 +223,7 @@ import { ImageConfigContext } from '../../shared/lib/image-config-context.shared
 import { imageConfigDefault } from '../../shared/lib/image-config'
 import { RenderStage, StagedRenderingController } from './staged-rendering'
 import {
+  anySegmentHasRuntimePrefetchEnabled,
   isPageAllowedToBlock,
   anySegmentNeedsInstantValidation,
 } from './instant-validation/instant-config'
@@ -539,6 +540,8 @@ async function generateDynamicRSCPayload(
       !options?.actionResult && // Only for navigations
       (await anySegmentNeedsInstantValidation(loaderTree))
 
+    const metadataIsRuntimePrefetchable =
+      await anySegmentHasRuntimePrefetchEnabled(loaderTree)
     const { Viewport, Metadata, MetadataOutlet } = createMetadataComponents({
       tree: loaderTree,
       parsedQuery: query,
@@ -547,6 +550,7 @@ async function generateDynamicRSCPayload(
       getDynamicParamFromSegment,
       workStore,
       serveStreamingMetadata,
+      isRuntimePrefetchable: metadataIsRuntimePrefetchable,
     })
 
     const rscHead = createElement(
@@ -1531,6 +1535,8 @@ async function getRSCPayload(
   const serveStreamingMetadata = !!ctx.renderOpts.serveStreamingMetadata
   const hasGlobalNotFound = !!tree[2]['global-not-found']
 
+  const metadataIsRuntimePrefetchable =
+    await anySegmentHasRuntimePrefetchEnabled(tree)
   const { Viewport, Metadata, MetadataOutlet } = createMetadataComponents({
     tree,
     // When it's using global-not-found, metadata errorType is undefined, which will retrieve the
@@ -1545,6 +1551,7 @@ async function getRSCPayload(
     getDynamicParamFromSegment,
     workStore,
     serveStreamingMetadata,
+    isRuntimePrefetchable: metadataIsRuntimePrefetchable,
   })
 
   const preloadCallbacks: PreloadCallbacks = []
@@ -1657,6 +1664,8 @@ async function getErrorRSCPayload(
   } = ctx
 
   const serveStreamingMetadata = !!ctx.renderOpts.serveStreamingMetadata
+  const metadataIsRuntimePrefetchable =
+    await anySegmentHasRuntimePrefetchEnabled(tree)
   const { Viewport, Metadata } = createMetadataComponents({
     tree,
     parsedQuery: query,
@@ -1666,6 +1675,7 @@ async function getErrorRSCPayload(
     getDynamicParamFromSegment,
     workStore,
     serveStreamingMetadata: serveStreamingMetadata,
+    isRuntimePrefetchable: metadataIsRuntimePrefetchable,
   })
 
   const initialHead = createElement(
