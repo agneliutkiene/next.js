@@ -482,6 +482,75 @@ describe('instant validation', () => {
       await waitForNoErrorToast(browser)
     })
 
+    it('invalid - runtime prefetch - sync IO in generateMetadata', async () => {
+      // The page has runtime prefetch enabled. generateMetadata uses
+      // cookies() then Date.now(). Since metadata belongs to the Page
+      // and the Page is runtime-prefetchable, this should error.
+      const browser = await navigateTo(
+        '/suspense-in-root/runtime/invalid-sync-io-in-generate-metadata'
+      )
+      await expect(browser).toDisplayCollapsedRedbox(`
+       {
+         "description": "Route "/suspense-in-root/runtime/invalid-sync-io-in-generate-metadata" used \`Date.now()\` before accessing either uncached data (e.g. \`fetch()\`) or awaiting \`connection()\`. When configured for Runtime prefetching, accessing the current time in a Server Component requires reading one of these data sources first. Alternatively, consider moving this expression into a Client Component or Cache Component. See more info here: https://nextjs.org/docs/messages/next-prerender-runtime-current-time",
+         "environmentLabel": "Server",
+         "label": "Console Error",
+         "source": "app/suspense-in-root/runtime/invalid-sync-io-in-generate-metadata/page.tsx (11:20) @ Module.generateMetadata
+       > 11 |   const now = Date.now()
+            |                    ^",
+         "stack": [
+           "Module.generateMetadata app/suspense-in-root/runtime/invalid-sync-io-in-generate-metadata/page.tsx (11:20)",
+           "Next.MetadataOutlet <anonymous>",
+         ],
+       }
+      `)
+    })
+
+    it('valid - runtime prefetch - sync IO in generateMetadata on a static page is allowed', async () => {
+      // The page does NOT have runtime prefetch. generateMetadata uses
+      // cookies() then Date.now(). Since no segment is runtime-prefetchable,
+      // sync IO in generateMetadata should be allowed.
+      const browser = await navigateTo(
+        '/suspense-in-root/runtime/valid-sync-io-in-generate-metadata-static-page'
+      )
+      await waitForNoErrorToast(browser)
+    })
+
+    it('invalid - runtime prefetch - sync IO in layout generateMetadata when page is prefetchable', async () => {
+      // The layout has generateMetadata with sync IO after cookies().
+      // The layout itself does NOT have runtime prefetch, but the child
+      // page does. Since metadata belongs to the Page, and the Page is
+      // runtime-prefetchable, sync IO in the layout's generateMetadata
+      // should error.
+      const browser = await navigateTo(
+        '/suspense-in-root/runtime/invalid-sync-io-in-layout-generate-metadata'
+      )
+      await expect(browser).toDisplayCollapsedRedbox(`
+       {
+         "description": "Route "/suspense-in-root/runtime/invalid-sync-io-in-layout-generate-metadata" used \`Date.now()\` before accessing either uncached data (e.g. \`fetch()\`) or awaiting \`connection()\`. When configured for Runtime prefetching, accessing the current time in a Server Component requires reading one of these data sources first. Alternatively, consider moving this expression into a Client Component or Cache Component. See more info here: https://nextjs.org/docs/messages/next-prerender-runtime-current-time",
+         "environmentLabel": "Server",
+         "label": "Console Error",
+         "source": "app/suspense-in-root/runtime/invalid-sync-io-in-layout-generate-metadata/layout.tsx (11:20) @ Module.generateMetadata
+       > 11 |   const now = Date.now()
+            |                    ^",
+         "stack": [
+           "Module.generateMetadata app/suspense-in-root/runtime/invalid-sync-io-in-layout-generate-metadata/layout.tsx (11:20)",
+           "Next.MetadataOutlet <anonymous>",
+         ],
+       }
+      `)
+    })
+
+    it('valid - runtime prefetch - sync IO in layout generateMetadata when page is NOT prefetchable', async () => {
+      // The layout has generateMetadata with sync IO after cookies().
+      // Neither the layout nor the page has runtime prefetch. Since no
+      // segment is runtime-prefetchable, sync IO in generateMetadata
+      // should be allowed.
+      const browser = await navigateTo(
+        '/suspense-in-root/runtime/valid-sync-io-in-layout-generate-metadata-static-page'
+      )
+      await waitForNoErrorToast(browser)
+    })
+
     it('invalid - missing suspense around dynamic (with loading.js)', async () => {
       const browser = await navigateTo(
         '/suspense-in-root/static/invalid-only-loading-around-dynamic'
