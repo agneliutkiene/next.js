@@ -28,7 +28,7 @@ describe(`Handle new URL asset references`, () => {
     /^blob:.*vercel\.[0-9a-f]{8,}\.png$/
   )
   const clientFilePath = expect.stringMatching(
-    /^\/_next\/static\/media\/vercel\.[0-9a-f]{8}\.png$/
+    /^\/_next\/static\/media\/vercel\.[0-9a-f]{8}\.png(\?dpl=.*)?$/
   )
 
   it('should respond on middleware api', async () => {
@@ -45,7 +45,7 @@ describe(`Handle new URL asset references`, () => {
   })
 
   const expectedPage =
-    /^Hello \/_next\/static\/media\/vercel\.[0-9a-f]{8}\.png(\+\/_next\/static\/media\/vercel\.[0-9a-f]{8}\.png(\+\/_next\/static\/media\/vercel\.[0-9a-f]{8}\.png)?)?$/
+    /^Hello \/_next\/static\/media\/vercel\.[0-9a-f]{8}\.png(\?dpl=.*)?(\+\/_next\/static\/media\/vercel\.[0-9a-f]{8}\.png(\?dpl=.*)?(\+\/_next\/static\/media\/vercel\.[0-9a-f]{8}\.png(\?dpl=.*)?)?)?$/
 
   describe('app router', () => {
     it('should respond on webmanifest', async () => {
